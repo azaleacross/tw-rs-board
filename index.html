@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>台股 RS 強勢股雷達</title>
+<meta name="description" content="全台股上市櫃普通股的短期／季／年相對強度（RS）、趨勢 R² 與創 N 日新高新低，每個交易日收盤後更新。">
+<meta name="theme-color" content="#0b0e13">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232962ff'/%3E%3Cpath d='M7 22l6-7 5 4 7-10' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>
+  // 主題在第一個畫面之前就決定，避免閃一下白底
+  try { const t = localStorage.getItem("rs-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<style>
+:root, :root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0b0e13; --panel:#12161d; --panel2:#181d26; --hover:#1d2430; --line:#232a35; --line2:#2e3643;
+  --ink:#e7eaf0; --ink2:#b4bbc7; --muted:#7c8594;
+  --up:#f23645; --up-a:rgba(242,54,69,.16); --up-b:rgba(242,54,69,.32);
+  --dn:#22ab94; --dn-a:rgba(34,171,148,.15); --dn-b:rgba(34,171,148,.30);
+  --flat:#7c8594;
+  --accent:#2962ff; --accent-a:rgba(41,98,255,.16); --accent-ink:#8fb0ff;
+  --warn:#f0a83a;
+  --shadow:0 8px 32px rgba(0,0,0,.45);
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#f3f4f7; --panel:#ffffff; --panel2:#f7f8fa; --hover:#f0f3f8; --line:#e4e7ec; --line2:#d6dae1;
+  --ink:#131722; --ink2:#434a57; --muted:#6b7381;
+  --up:#e5303f; --up-a:rgba(229,48,63,.10); --up-b:rgba(229,48,63,.22);
+  --dn:#0b8a74; --dn-a:rgba(11,138,116,.10); --dn-b:rgba(11,138,116,.22);
+  --flat:#8a929f;
+  --accent:#2962ff; --accent-a:rgba(41,98,255,.10); --accent-ink:#2962ff;
+  --warn:#b26b00;
+  --shadow:0 8px 28px rgba(16,24,40,.14);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:13.5px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.up{color:var(--up)} .dn{color:var(--dn)} .flat{color:var(--flat)} .mut{color:var(--muted)}
+.wrap{max-width:1440px;margin:0 auto;padding:0 20px}
+
+/* ---------- 頂部列 ---------- */
+.top{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:54px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:.02em;white-space:nowrap}
+.logo{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center;flex:none}
+.meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12.5px;min-width:0;overflow:hidden;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink2);white-space:nowrap}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--dn)}
+.spacer{flex:1}
+.iconbtn{height:32px;min-width:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;color:var(--ink2);font-size:12.5px}
+.iconbtn:hover{background:var(--hover);color:var(--ink)}
+.iconbtn svg{width:16px;height:16px;flex:none}
+
+/* ---------- 市場概況 ---------- */
+.overview{display:grid;grid-template-columns:1.25fr 1fr 1fr 1fr;gap:12px;margin:16px 0 12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.card h3{margin:0 0 8px;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.02em}
+.big{font-size:22px;font-weight:650;letter-spacing:-.01em;line-height:1.15}
+.big small{font-size:12px;font-weight:500;color:var(--muted);margin-left:4px}
+.breadth{display:flex;height:8px;border-radius:999px;overflow:hidden;gap:2px;margin:9px 0 6px;background:var(--panel)}
+.breadth i{display:block;height:100%}
+.legend{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.legend b{font-weight:600}
+.duo{display:flex;align-items:baseline;gap:14px}
+.duo > div{min-width:0}
+.duo .lab{font-size:11.5px;color:var(--muted);display:block}
+.sub2{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+/* ---------- 產業強弱 ---------- */
+.section-h{display:flex;align-items:baseline;gap:10px;margin:18px 0 8px}
+.section-h h2{margin:0;font-size:14px;font-weight:650}
+.section-h .hint{font-size:12px;color:var(--muted)}
+.heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:4px}
+.tile{position:relative;border-radius:8px;padding:7px 9px;cursor:pointer;border:1px solid transparent;min-height:54px;text-align:left;background:var(--panel2);color:var(--ink)}
+.tile:hover{border-color:var(--line2)}
+.tile.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.tile .n{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;padding-right:26px}
+.tile .v{font-size:16px;font-weight:700;display:block;margin-top:1px}
+.tile .c{position:absolute;right:8px;top:8px;font-size:11px;color:var(--ink2);opacity:.8}
+
+/* ---------- 篩選工具列 ---------- */
+.toolbar{position:sticky;top:54px;z-index:30;background:var(--bg);padding:10px 0 0;margin-top:14px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px 9px;cursor:pointer;color:var(--muted);font-weight:550;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .cnt{font-size:11px;color:var(--muted);margin-left:5px;font-weight:500}
+.filters{display:flex;gap:8px;align-items:center;padding:10px 0;flex-wrap:wrap}
+.search{position:relative;flex:0 1 260px;min-width:160px}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--muted)}
+.search input{width:100%;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel);padding:0 10px 0 32px;outline:none}
+.search input:focus,.sel:focus{border-color:var(--accent)}
+.sel{height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel);padding:0 8px;outline:none;cursor:pointer;color:var(--ink2)}
+.count{margin-left:auto;color:var(--muted);font-size:12.5px;white-space:nowrap}
+.clear{background:none;border:0;color:var(--accent-ink);cursor:pointer;font-size:12.5px;padding:0 4px;display:none}
+.clear.show{display:inline}
+
+/* ---------- 表格（桌機） ---------- */
+.grid{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:16px}
+.scroll{overflow-x:auto}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1180px}
+thead th{position:sticky;top:var(--th-top,0px);z-index:5;background:var(--panel2);color:var(--muted);font-size:11.5px;font-weight:550;
+  text-align:right;padding:0 10px;height:34px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+thead tr.grp th{position:static;height:24px;cursor:default;font-size:11px;color:var(--muted);text-align:center;border-bottom:0;padding-top:4px}
+thead tr.grp th span{display:block;border-bottom:1px solid var(--line2);padding-bottom:3px;margin:0 4px}
+thead th:hover{color:var(--ink)}
+thead th.on{color:var(--accent-ink)}
+thead th .ar{display:inline-block;width:9px;font-size:9px;margin-left:2px}
+th.l,td.l{text-align:left}
+tbody td{padding:0 10px;height:40px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--hover)}
+tbody tr:last-child td{border-bottom:0}
+td.stock{position:sticky;left:0;background:var(--panel);z-index:2;min-width:168px;max-width:200px}
+th.stock{position:sticky;left:0;z-index:6}
+tbody tr:hover td.stock{background:var(--hover)}
+.sname{display:flex;flex-direction:column;line-height:1.2}
+.sname b{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis}
+.sname span{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sname{min-width:0}
+.dshort{display:none}
+.mk{display:inline-block;font-size:10px;padding:0 4px;border-radius:3px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);margin:0 4px 0 5px;line-height:14px;vertical-align:middle;position:relative;top:-1px}
+.ind{color:var(--ink2);font-size:12.5px}
+.px{font-weight:600}
+.chg{display:inline-block;min-width:64px;text-align:right;font-weight:600}
+.rs{display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;width:46px}
+.rs b{font-weight:650;font-size:13.5px;line-height:1}
+.rs i{display:block;height:3px;border-radius:2px;width:100%;background:var(--line);position:relative;overflow:hidden}
+.rs i::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--w);background:var(--c);border-radius:2px}
+.r2{display:inline-flex;align-items:center;gap:6px}
+.r2 .trk{position:relative;width:30px;height:6px;background:var(--line);border-radius:3px}
+.r2 .trk::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line2)}
+.r2 .fill{position:absolute;top:0;bottom:0;border-radius:3px}
+.r2 b{font-weight:550;font-size:12.5px;width:34px;text-align:right}
+.hl{display:inline-block;min-width:56px;text-align:center;border-radius:5px;padding:2px 6px;font-size:12px;font-weight:600}
+.hl.p{background:var(--up-a);color:var(--up)} .hl.n{background:var(--dn-a);color:var(--dn)}
+.hl.p.x{background:var(--up);color:#fff} .hl.n.x{background:var(--dn);color:#fff}
+.warn{color:var(--warn);font-size:11px;margin-left:4px;cursor:help}
+svg.spark{display:block}
+.empty{padding:56px 16px;text-align:center;color:var(--muted)}
+.sentinel{height:1px}
+
+/* ---------- 手機列表 ---------- */
+.mlist{display:none}
+.mhead{display:grid;grid-template-columns:1fr 62px 66px 76px;gap:8px;align-items:center;padding:8px 14px;font-size:11.5px;color:var(--muted);
+  position:sticky;top:var(--mh-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.mhead button{background:none;border:0;padding:0;color:inherit;font-size:11.5px;cursor:pointer;text-align:right}
+.mhead .on{color:var(--accent-ink)}
+.mhead select{appearance:none;-webkit-appearance:none;background:none;border:0;color:var(--accent-ink);font-size:11.5px;text-align:right;text-align-last:right;padding:0;width:100%;cursor:pointer}
+.mrow{display:grid;grid-template-columns:1fr 62px 66px 76px;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.mrow:active{background:var(--hover)}
+.mrow .sname b{font-size:15px}
+.mrow .metric{text-align:right;font-weight:650;font-size:14px}
+.mrow .metric small{display:block;font-size:10.5px;color:var(--muted);font-weight:500}
+.cbox{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.cpill{display:inline-block;min-width:72px;text-align:center;border-radius:6px;padding:4px 0;font-weight:650;font-size:13px;color:#fff;background:var(--flat)}
+.cpill.up{background:var(--up)} .cpill.dn{background:var(--dn)}
+.cbox .p{font-size:11.5px;color:var(--ink2)}
+
+/* ---------- 詳情面板 ---------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;opacity:0;pointer-events:none;transition:opacity .18s}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:fixed;z-index:61;background:var(--panel);box-shadow:var(--shadow);transition:transform .22s cubic-bezier(.2,.8,.2,1);overflow-y:auto}
+@media (min-width: 761px){ .sheet{top:0;right:0;bottom:0;width:420px;border-left:1px solid var(--line);transform:translateX(100%)} .sheet.show{transform:none} }
+.sheet .hd{display:flex;align-items:flex-start;gap:10px;padding:18px 18px 10px}
+.sheet .hd h3{margin:0;font-size:19px;font-weight:700}
+.sheet .hd .s{color:var(--muted);font-size:12.5px;margin-top:2px}
+.sheet .close{margin-left:auto}
+.sheet .pxrow{display:flex;align-items:baseline;gap:10px;padding:0 18px}
+.sheet .pxrow .big{font-size:26px}
+.sheet .chart{padding:6px 12px 2px}
+.sheet .chart .cap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);padding:0 6px}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 18px}
+.kv.four{grid-template-columns:repeat(4,1fr);padding-top:0}
+.kv div{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.kv > div > span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.kv b{font-size:17px;font-weight:700}
+.kv.four b{font-size:14.5px}
+.sheet .links{display:flex;gap:8px;padding:6px 18px 22px}
+.sheet .links a{flex:1;text-align:center;height:38px;line-height:38px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);font-weight:600;font-size:13px}
+.sheet .links a.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.sheet .note{margin:0 18px 18px;font-size:12px;color:var(--muted);line-height:1.6}
+
+/* ---------- 說明 / 頁尾 ---------- */
+.help{display:grid;grid-template-columns:max-content 1fr;gap:8px 16px;margin:0;padding:4px 18px 22px;font-size:13px}
+.help dt{font-weight:650}
+.help dd{margin:0;color:var(--ink2)}
+footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;border-top:1px solid var(--line);margin-top:8px}
+
+/* ---------- 響應式 ---------- */
+@media (max-width: 1100px){ .overview{grid-template-columns:1fr 1fr} }
+@media (max-width: 760px){
+  .wrap{padding:0 14px}
+  .top .wrap{height:50px;gap:10px}
+  .brand{font-size:15px}
+  .meta .pill.cnt,.meta .pill.ver{display:none}
+  .lbl-help{display:none}
+  .dfull{display:none} .dshort{display:inline}
+  .overview{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:12px -14px 6px;padding:0 14px;scrollbar-width:none}
+  .overview::-webkit-scrollbar{display:none}
+  .overview .card{flex:0 0 74%;scroll-snap-align:start}
+  .heat{display:flex;overflow-x:auto;gap:6px;margin:0 -14px;padding:0 14px 2px;scrollbar-width:none}
+  .heat::-webkit-scrollbar{display:none}
+  .tile{flex:0 0 104px}
+  .toolbar{position:static;margin-top:8px}
+  .filters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .search{grid-column:1 / -1;flex:none;min-width:0}
+  .search input{height:36px;font-size:15px}
+  .filters .sel{width:100%;min-width:0;height:34px;padding:0 4px}
+  .clear{grid-column:1 / -1;justify-self:start}
+  .count{display:none}
+  .grid{display:none}
+  .mlist{display:block;margin:0 -14px 12px;background:var(--panel)}
+  .sheet{left:0;right:0;bottom:0;max-height:88vh;border-radius:16px 16px 0 0;transform:translateY(100%);border-top:1px solid var(--line)}
+  .sheet.show{transform:none}
+  .sheet::before{content:"";display:block;width:38px;height:4px;border-radius:2px;background:var(--line2);margin:8px auto 0}
+  .help{grid-template-columns:1fr}
+  .help dd{margin-bottom:6px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="logo"><svg viewBox="0 0 32 32" width="18" height="18" aria-hidden="true"><path d="M5 23l7-8 5 4 9-11" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span>台股 RS 強勢股雷達</span>
+    </div>
+    <div class="meta" id="meta"></div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="helpBtn" aria-label="指標說明"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/></svg><span class="lbl-help">說明</span></button>
+    <button class="iconbtn" id="themeBtn" aria-label="切換深色／淺色"><svg id="themeIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"></svg></button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="overview" id="overview" aria-label="市場概況"></section>
+
+  <div class="section-h"><h2>產業強弱</h2><span class="hint">依產業內個股短 RS 中位數排序，點一下篩選該產業</span></div>
+  <div class="heat" id="heat" role="list"></div>
+
+  <div class="toolbar" id="toolbar">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="filters">
+      <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="代號或名稱" autocomplete="off" inputmode="search"></label>
+      <select class="sel" id="mkt" aria-label="市場"><option value="">全部市場</option><option value="市">上市</option><option value="櫃">上櫃</option></select>
+      <select class="sel" id="ind" aria-label="產業"><option value="">全部產業</option></select>
+      <select class="sel" id="amt" aria-label="20日均成交額">
+        <option value="0">均額不限</option><option value="0.1">≥ 1千萬</option><option value="0.5">≥ 5千萬</option>
+        <option value="1">≥ 1億</option><option value="5">≥ 5億</option></select>
+      <button class="clear" id="clear">清除篩選</button>
+      <span class="count" id="count"></span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="scroll" id="scroll">
+      <table>
+        <thead>
+          <tr class="grp"><th colspan="6"></th><th colspan="3"><span>相對強度 RS（1~99）</span></th><th colspan="4"><span>趨勢 R²（+ 順漲／− 順跌）</span></th><th></th></tr>
+          <tr id="thead"></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="mlist" id="mlist">
+    <div class="mhead" id="mhead"></div>
+    <div id="mrows"></div>
+  </div>
+  <div class="sentinel" id="sentinel"></div>
+
+  <footer>
+    本站僅整理公開市場資料計算之客觀指標，不構成任何投資建議或買賣推薦，投資請自行判斷並承擔風險。<br>
+    資料來源：臺灣證券交易所、證券櫃檯買賣中心、Yahoo Finance。每個交易日收盤後更新。
+  </footer>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="個股詳情"></aside>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const fmt = (v, nd = 0) => v == null ? "–" : v.toLocaleString("zh-TW", {minimumFractionDigits: nd, maximumFractionDigits: nd});
+  const pxd = v => v == null ? 2 : v < 100 ? 2 : v < 1000 ? 1 : 0;
+  const amtTxt = v => v == null ? "–" : v >= 1 ? fmt(v, v >= 100 ? 0 : 1) + "億" : fmt(Math.max(v * 1e4, 1), 0) + "萬";
+  const cls = v => v == null || v === 0 ? "flat" : v > 0 ? "up" : "dn";
+  const sgn = v => v > 0 ? "+" : "";
+  const ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
+
+  // ---------- 分頁（預設篩選） ----------
+  const TABS = [
+    {k: "all",   t: "全部",       f: () => true},
+    {k: "lead",  t: "三 RS 皆強", f: r => r.rs_s >= 80 && r.rs_q >= 80 && r.rs_y >= 80, s: "rs_y",
+     d: "短、季、年 RS 都 ≥ 80：長短期都站在前 20% 的領漲股"},
+    {k: "turn",  t: "短線轉強",   f: r => r.rs_s >= 85 && r.rs_y != null && r.rs_y < 60, s: "rs_s",
+     d: "短 RS ≥ 85 但年 RS < 60：過去一年不強、最近突然變強，可能是新題材的起點"},
+    {k: "burst", t: "短 RS ≥ 90", f: r => r.rs_s >= 90, s: "rs_s", d: "最近 20 日漲勢在全市場前 10%"},
+    {k: "high",  t: "創 60 日新高", f: r => r.hl >= 60, s: "hl", d: "收盤創近 60 個交易日以上新高"},
+    {k: "trend", t: "趨勢最穩",   f: r => r.r2_60 >= 0.8 && r.r2_120 >= 0.5, s: "r2_60",
+     d: "R² 60 ≥ 0.8 且 R² 120 ≥ 0.5：漲得又直又穩，回檔小"},
+    {k: "weak",  t: "弱勢股",     f: r => r.rs_s <= 10 && r.rs_q <= 20, s: "rs_s", dir: "asc",
+     d: "短 RS ≤ 10 且季 RS ≤ 20：短期與中期都在全市場最弱的一群"},
+  ];
+  const TABMAP = Object.fromEntries(TABS.map(t => [t.k, t]));
+
+  // ---------- 表格欄位 ----------
+  const COLS = [
+    {k: "code",   t: "股票",     l: true, cls: "stock", text: true},
+    {k: "ind",    t: "產業",     l: true, text: true},
+    {k: "spark",  t: "60 日走勢", l: true, nosort: true},
+    {k: "close",  t: "收盤"},
+    {k: "chg",    t: "漲跌幅"},
+    {k: "amt",    t: "均額"},
+    {k: "rs_s",   t: "短RS"},
+    {k: "rs_q",   t: "季RS"},
+    {k: "rs_y",   t: "年RS"},
+    {k: "r2_10",  t: "R² 10"},
+    {k: "r2_20",  t: "R² 20"},
+    {k: "r2_60",  t: "R² 60"},
+    {k: "r2_120", t: "R² 120"},
+    {k: "hl",     t: "創新高／低"},
+  ];
+  const MOBILE_METRICS = {rs_s: "短 RS", rs_q: "季 RS", rs_y: "年 RS", hl: "新高低", r2_20: "R² 20", r2_60: "R² 60",
+    r2_120: "R² 120", r2_10: "R² 10", amt: "均額", close: "收盤"};
+  const PAGE = 100;
+
+  // ---------- 狀態（同步到網址 #，複製網址給朋友就是同一個畫面） ----------
+  const st = {v: "all", q: "", mkt: "", ind: "", amt: "0", s: "rs_y", d: "desc", mm: "rs_y"};
+  let ALL = [], view = [], shown = 0, DATA = null;
+
+  const readHash = () => {
+    const h = new URLSearchParams(location.hash.slice(1));
+    st.v = TABMAP[h.get("v")] ? h.get("v") : "all";
+    st.q = h.get("q") || ""; st.mkt = h.get("m") || ""; st.ind = h.get("i") || ""; st.amt = h.get("a") || "0";
+    st.s = h.get("s") || (TABMAP[st.v].s || "rs_y"); st.d = h.get("d") || (TABMAP[st.v].dir || "desc");
+    st.mm = MOBILE_METRICS[h.get("mm")] ? h.get("mm") : (MOBILE_METRICS[st.s] ? st.s : "rs_y");
+  };
+  const writeHash = () => {
+    const h = new URLSearchParams();
+    if (st.v !== "all") h.set("v", st.v); if (st.q) h.set("q", st.q); if (st.mkt) h.set("m", st.mkt);
+    if (st.ind) h.set("i", st.ind); if (st.amt !== "0") h.set("a", st.amt);
+    const t = TABMAP[st.v];
+    if (st.s !== (t.s || "rs_y")) h.set("s", st.s); if (st.d !== (t.dir || "desc")) h.set("d", st.d);
+    if (st.mm !== "rs_y" && st.mm !== st.s) h.set("mm", st.mm);
+    const s = h.toString();
+    history.replaceState(null, "", s ? "#" + s : location.pathname + location.search);
+  };
+
+  // ---------- 小元件 ----------
+  function decode(s){ return s ? [...s].map(c => c === "~" ? null : ALPHA.indexOf(c)) : []; }
+  function spark(s, w = 96, h = 28, area = false){
+    const v = decode(s); if (v.length < 2) return `<span class="mut">–</span>`;
+    const pts = []; let first = null, last = null;
+    v.forEach((y, i) => { if (y == null) return; if (first == null) first = y; last = y;
+      pts.push([(i / (v.length - 1) * (w - 2) + 1).toFixed(1), (h - 2 - y / 63 * (h - 4)).toFixed(1)]); });
+    const c = last > first ? "var(--up)" : last < first ? "var(--dn)" : "var(--flat)";
+    const line = pts.map(p => p.join(",")).join(" ");
+    const fill = area ? `<polygon points="${pts[0][0]},${h} ${line} ${pts[pts.length - 1][0]},${h}" fill="${c}" opacity=".12"/>` : "";
+    return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${fill}<polyline points="${line}" fill="none" stroke="${c}" stroke-width="${area ? 2 : 1.5}" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  }
+  const rsColor = v => v >= 90 ? "var(--up)" : v >= 80 ? "color-mix(in srgb,var(--up) 70%,var(--muted))"
+    : v <= 10 ? "var(--dn)" : v <= 20 ? "color-mix(in srgb,var(--dn) 70%,var(--muted))" : "var(--muted)";
+  const rsTxt = v => v == null ? `<span class="mut">–</span>`
+    : `<span class="rs"><b style="color:${v >= 80 ? "var(--up)" : v <= 20 ? "var(--dn)" : "var(--ink)"}">${v}</b><i style="--w:${v}%;--c:${rsColor(v)}"></i></span>`;
+  const r2Txt = v => {
+    if (v == null) return `<span class="mut">–</span>`;
+    const w = Math.abs(v) * 50, c = v >= 0 ? "var(--up)" : "var(--dn)";
+    const pos = v >= 0 ? `left:50%;width:${w}%` : `right:50%;width:${w}%`;
+    return `<span class="r2"><span class="trk"><span class="fill" style="${pos};background:${c};opacity:${(.35 + .65 * Math.abs(v)).toFixed(2)}"></span></span><b class="${Math.abs(v) >= .5 ? cls(v) : "mut"}">${sgn(v)}${v.toFixed(2)}</b></span>`;
+  };
+  const hlTxt = v => v == null ? "–" : v === 0 ? `<span class="mut">–</span>`
+    : `<span class="hl ${v > 0 ? "p" : "n"}${Math.abs(v) >= 250 ? " x" : ""}">${v > 0 ? "新高" : "新低"} ${Math.abs(v) >= 250 ? "250" : Math.abs(v)}</span>`;
+  const chgTxt = v => v == null ? "–" : `<span class="chg ${cls(v)}">${sgn(v)}${v.toFixed(2)}%</span>`;
+  const warn = r => (r.flag & 1) ? `<span class="warn" title="近一年有單日漲跌超過 11%（興櫃期／新上市／減資），長天期報酬含無漲跌幅限制的行情">⚠</span>` : "";
+  const mkTag = r => `<span class="mk">${r.mkt}</span>`;
+
+  // ---------- 市場概況 ----------
+  function renderOverview(){
+    const n = ALL.length, up = ALL.filter(r => r.chg > 0).length, dn = ALL.filter(r => r.chg < 0).length, fl = n - up - dn;
+    const nh = k => ALL.filter(r => r.hl >= k).length, nl = k => ALL.filter(r => r.hl <= -k).length;
+    const lead = ALL.filter(TABMAP.lead.f).length, turn = ALL.filter(TABMAP.turn.f).length;
+    const pct = x => (x / n * 100).toFixed(1);
+    const above = ALL.filter(r => r.r2_60 != null && r.r2_60 > 0).length;
+    $("overview").innerHTML = `
+      <div class="card"><h3>市場廣度</h3>
+        <div class="big"><span class="up">${up}</span><small>上漲</small> <span class="dn" style="margin-left:10px">${dn}</span><small>下跌</small></div>
+        <div class="breadth" role="img" aria-label="上漲 ${up}、平盤 ${fl}、下跌 ${dn}">
+          <i style="width:${pct(up)}%;background:var(--up)"></i><i style="width:${pct(fl)}%;background:var(--flat);opacity:.5"></i><i style="width:${pct(dn)}%;background:var(--dn)"></i></div>
+        <div class="legend"><span>上漲 <b class="up">${pct(up)}%</b></span><span>平盤 ${fl}</span><span>下跌 <b class="dn">${pct(dn)}%</b></span></div></div>
+      <div class="card"><h3>創新高 vs 新低</h3>
+        <div class="duo"><div><span class="lab">250 日</span><span class="big"><span class="up">${nh(250)}</span> <small>/</small> <span class="dn">${nl(250)}</span></span></div>
+        <div><span class="lab">20 日以上</span><span class="big"><span class="up">${nh(20)}</span> <small>/</small> <span class="dn">${nl(20)}</span></span></div></div>
+        <div class="sub2">左為新高家數、右為新低家數</div></div>
+      <div class="card"><h3>強勢股</h3>
+        <div class="duo"><div><span class="lab">三 RS 皆強</span><span class="big">${lead}<small>檔</small></span></div>
+        <div><span class="lab">短線轉強</span><span class="big">${turn}<small>檔</small></span></div></div>
+        <div class="sub2">點下方分頁可看名單</div></div>
+      <div class="card"><h3>中期趨勢</h3>
+        <div class="big">${pct(above)}<small>%</small></div>
+        <div class="sub2">60 日趨勢向上（R² 60 為正）的股票比例；高於 50% 代表多數股票處於上升段</div></div>`;
+  }
+
+  // ---------- 產業熱力圖 ----------
+  const median = a => { const s = a.filter(x => x != null).sort((x, y) => x - y); if (!s.length) return null;
+    const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  let INDS = [];
+  function heatBg(v){
+    // 50 為中性灰；越強越紅、越弱越綠（台股慣例）
+    const t = Math.min(Math.abs(v - 50) / 35, 1);
+    const c = v >= 50 ? "var(--up)" : "var(--dn)";
+    return `color-mix(in srgb, ${c} ${Math.round(12 + t * 58)}%, var(--panel2))`;
+  }
+  function renderHeat(){
+    const g = {};
+    ALL.forEach(r => { if (r.ind) (g[r.ind] = g[r.ind] || []).push(r); });
+    INDS = Object.entries(g).filter(([, a]) => a.length >= 3).map(([k, a]) => ({
+      k, n: a.length, rs: median(a.map(r => r.rs_s)), rq: median(a.map(r => r.rs_q)),
+      up: a.filter(r => r.chg > 0).length / a.length,
+    })).sort((a, b) => b.rs - a.rs);
+    $("heat").innerHTML = INDS.map(x => {
+      const strong = Math.abs(x.rs - 50) > 25;
+      return `<button class="tile${st.ind === x.k ? " on" : ""}" data-ind="${esc(x.k)}" role="listitem"
+        style="background:${heatBg(x.rs)};${strong ? "color:#fff" : ""}"
+        title="${esc(x.k)}：${x.n} 檔，短 RS 中位數 ${Math.round(x.rs)}、季 RS 中位數 ${Math.round(x.rq)}，今日上漲比例 ${Math.round(x.up * 100)}%">
+        <span class="n">${esc(x.k)}</span><span class="v num">${Math.round(x.rs)}</span><span class="c">${x.n}</span></button>`;
+    }).join("");
+  }
+
+  // ---------- 篩選與排序 ----------
+  function baseFilter(r){
+    const q = st.q.trim().toLowerCase(), minAmt = parseFloat(st.amt) || 0;
+    return (!q || r.code.startsWith(q) || r.name.toLowerCase().includes(q)) &&
+      (!st.mkt || r.mkt === st.mkt) && (!st.ind || r.ind === st.ind) &&
+      (!minAmt || (r.amt != null && r.amt >= minAmt));
+  }
+  function apply(){
+    const base = ALL.filter(baseFilter);
+    TABS.forEach(t => { const el = document.querySelector(`.tab[data-v="${t.k}"] .cnt`); if (el) el.textContent = base.filter(t.f).length; });
+    view = base.filter(TABMAP[st.v].f);
+    const k = st.s, dir = st.d === "asc" ? 1 : -1, text = k === "code" || k === "ind";
+    view.sort((a, b) => {
+      const x = a[k], y = b[k];
+      if (x == null && y == null) return a.code < b.code ? -1 : 1;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      if (x === y) return ((b.rs_y ?? -1) - (a.rs_y ?? -1)) || (a.code < b.code ? -1 : 1);
+      return (text ? (x < y ? -1 : 1) : x - y) * dir;
+    });
+    shown = 0;
+    $("tbody").innerHTML = ""; $("mrows").innerHTML = "";
+    $("count").textContent = `${view.length.toLocaleString()} 檔`;
+    $("clear").classList.toggle("show", !!(st.q || st.mkt || st.ind || st.amt !== "0"));
+    if (!view.length){
+      const msg = `<div class="empty">沒有符合條件的股票${(st.q || st.mkt || st.ind || st.amt !== "0") ? "，試試清除篩選" : ""}</div>`;
+      $("tbody").innerHTML = `<tr><td colspan="${COLS.length}" style="height:auto">${msg}</td></tr>`;
+      $("mrows").innerHTML = msg;
+    }
+    renderHead(); more(); writeHash();
+    document.querySelectorAll(".tile").forEach(el => el.classList.toggle("on", el.dataset.ind === st.ind));
+  }
+
+  // ---------- 繪製列 ----------
+  function rowHTML(r, i){
+    return `<tr data-i="${i}">
+      <td class="l stock"><div class="sname"><b>${esc(r.name)}${warn(r)}</b><span>${r.code}${mkTag(r)}</span></div></td>
+      <td class="l ind">${esc(r.ind)}</td>
+      <td class="l">${spark(r.spark)}</td>
+      <td class="px">${fmt(r.close, pxd(r.close))}</td>
+      <td>${chgTxt(r.chg)}</td>
+      <td class="ind">${amtTxt(r.amt)}</td>
+      <td>${rsTxt(r.rs_s)}</td><td>${rsTxt(r.rs_q)}</td><td>${rsTxt(r.rs_y)}</td>
+      <td>${r2Txt(r.r2_10)}</td><td>${r2Txt(r.r2_20)}</td><td>${r2Txt(r.r2_60)}</td><td>${r2Txt(r.r2_120)}</td>
+      <td>${hlTxt(r.hl)}</td></tr>`;
+  }
+  function metricTxt(r){
+    const k = st.mm, v = r[k];
+    if (k.startsWith("rs_")) return v == null ? "–" : `<span style="color:${v >= 80 ? "var(--up)" : v <= 20 ? "var(--dn)" : "var(--ink)"}">${v}</span>`;
+    if (k.startsWith("r2_")) return v == null ? "–" : `<span class="${Math.abs(v) >= .5 ? cls(v) : ""}">${sgn(v)}${v.toFixed(2)}</span>`;
+    if (k === "hl") return !v ? `<span class="mut">–</span>` : `<span class="${v > 0 ? "up" : "dn"}">${v > 0 ? "高" : "低"}${Math.abs(v)}</span>`;
+    if (k === "amt") return `<span style="font-size:13px">${amtTxt(v)}</span>`;
+    if (k === "close") return fmt(v, pxd(v));
+    return v ?? "–";
+  }
+  function mrowHTML(r, i){
+    return `<div class="mrow" data-i="${i}">
+      <div class="sname"><b>${esc(r.name)}${warn(r)}</b><span>${r.code}${mkTag(r)} ${esc(r.ind)}</span></div>
+      <div>${spark(r.spark, 62, 26)}</div>
+      <div class="metric num">${metricTxt(r)}</div>
+      <div class="cbox"><span class="cpill ${cls(r.chg)}">${r.chg == null ? "–" : sgn(r.chg) + r.chg.toFixed(2) + "%"}</span><span class="p num">${fmt(r.close, pxd(r.close))}</span></div></div>`;
+  }
+  const mq = matchMedia("(max-width: 760px)");
+  function more(){
+    if (shown >= view.length) return;
+    const slice = view.slice(shown, shown + PAGE), start = shown;
+    shown += slice.length;
+    if (mq.matches) $("mrows").insertAdjacentHTML("beforeend", slice.map((r, j) => mrowHTML(r, start + j)).join(""));
+    else $("tbody").insertAdjacentHTML("beforeend", slice.map((r, j) => rowHTML(r, start + j)).join(""));
+  }
+  mq.addEventListener("change", () => { apply(); setOffsets(); });
+
+  function renderHead(){
+    $("thead").innerHTML = COLS.map(c => {
+      const on = c.k === st.s;
+      return `<th class="${c.l ? "l " : ""}${c.cls || ""}${on ? " on" : ""}" ${c.nosort ? "" : `data-k="${c.k}"`} ${c.nosort ? 'style="cursor:default"' : ""}>${c.t}<span class="ar">${on ? (st.d === "asc" ? "▲" : "▼") : ""}</span></th>`;
+    }).join("");
+    const mopts = Object.entries(MOBILE_METRICS).map(([k, t]) => `<option value="${k}"${k === st.mm ? " selected" : ""}>${t} ▾</option>`).join("");
+    const on = k => st.s === k ? " on" : "";
+    const ar = k => st.s === k ? (st.d === "asc" ? " ▲" : " ▼") : "";
+    $("mhead").innerHTML = `
+      <button data-ms="code" style="text-align:left" class="${on("code")}">名稱／代號${ar("code")}</button>
+      <span>60 日走勢</span>
+      <select id="mm" aria-label="切換顯示的指標">${mopts}</select>
+      <button data-ms="chg" class="${on("chg")}">漲跌幅${ar("chg")}</button>`;
+    $("mm").addEventListener("change", e => { st.mm = e.target.value; st.s = st.mm; st.d = "desc"; apply(); });
+  }
+
+  // ---------- 詳情面板 ----------
+  function openSheet(r){
+    const tv = `https://www.tradingview.com/chart/?symbol=${r.mkt === "市" ? "TWSE" : "TPEX"}%3A${r.code}`;
+    const yh = `https://tw.stock.yahoo.com/quote/${r.code}.${r.mkt === "市" ? "TW" : "TWO"}/technical-analysis`;
+    const box = (k, v) => `<div><span>${k}</span><b class="num">${v}</b></div>`;
+    const rsv = v => v == null ? "–" : `<span style="color:${v >= 80 ? "var(--up)" : v <= 20 ? "var(--dn)" : "var(--ink)"}">${v}</span>`;
+    const r2v = v => v == null ? "–" : `<span class="${Math.abs(v) >= .5 ? cls(v) : ""}">${sgn(v)}${v.toFixed(2)}</span>`;
+    const w = Math.min(innerWidth, 420) - 24;
+    $("sheet").innerHTML = `
+      <div class="hd"><div><h3>${esc(r.name)} <span class="mut" style="font-size:14px;font-weight:500">${r.code}</span></h3>
+        <div class="s">${r.mkt === "市" ? "上市" : "上櫃"}・${esc(r.ind)}・均額 ${amtTxt(r.amt)}</div></div>
+        <button class="iconbtn close" id="closeSheet" aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="pxrow"><span class="big num">${fmt(r.close, pxd(r.close))}</span>${chgTxt(r.chg)}${r.hl ? hlTxt(r.hl) : ""}</div>
+      <div class="chart">${spark(r.spark, w, 110, true)}<div class="cap"><span>60 個交易日前</span><span>${DATA.date}</span></div></div>
+      <div class="kv">${box("短 RS", rsv(r.rs_s))}${box("季 RS", rsv(r.rs_q))}${box("年 RS", rsv(r.rs_y))}</div>
+      <div class="kv four">${box("R² 10", r2v(r.r2_10))}${box("R² 20", r2v(r.r2_20))}${box("R² 60", r2v(r.r2_60))}${box("R² 120", r2v(r.r2_120))}</div>
+      ${(r.flag & 1) ? `<p class="note">⚠ 近一年有單日漲跌超過 11% 的交易日（興櫃期、新上市前 5 日或減資換股），長天期報酬含沒有漲跌幅限制的行情。</p>` : ""}
+      <div class="links"><a class="pri" href="${tv}" target="_blank" rel="noopener">TradingView 線圖</a><a href="${yh}" target="_blank" rel="noopener">Yahoo 股市</a></div>`;
+    showSheet();
+  }
+  function openHelp(){
+    $("sheet").innerHTML = `
+      <div class="hd"><div><h3>指標說明</h3><div class="s">全部用還原權息收盤價計算</div></div>
+        <button class="iconbtn close" id="closeSheet" aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <dl class="help">
+        <dt>短 RS</dt><dd>0.4×5日 + 0.2×10日 + 0.2×15日 + 0.2×20日漲幅，在全體上市櫃普通股中的百分位（99 最強）。結構比照 IBD 年 RS，把時間縮短到 20 日，反應最快。</dd>
+        <dt>季 RS</dt><dd>近 63 個交易日（約一季）漲幅的全市場百分位。</dd>
+        <dt>年 RS</dt><dd>《超級績效》引用的 IBD 相對強度：0.4×近一季 + 0.2×近兩季 + 0.2×近三季 + 0.2×近四季漲幅的全市場百分位。</dd>
+        <dt>R²</dt><dd>對數收盤價對時間做線性回歸的 R²，代表走勢有多「直」。乘上斜率正負號：+0.9 是很順的上漲、−0.9 是很順的下跌、接近 0 是盤整或亂跳。</dd>
+        <dt>創新高／低</dt><dd>「新高 87」代表收盤創近 87 個交易日新高，「新低 30」代表創 30 日新低，最多算到 250 日（約一年）。</dd>
+        <dt>均額</dt><dd>近 20 日平均成交金額。</dd>
+        <dt>產業強弱</dt><dd>產業內個股短 RS 的中位數，50 是全市場中間值；越紅越強、越綠越弱。右上角數字是該產業檔數。</dd>
+        ${TABS.filter(t => t.d).map(t => `<dt>${t.t}</dt><dd>${t.d}</dd>`).join("")}
+        <dt>⚠ 標記</dt><dd>近一年有單日漲跌超過 11% 的交易日，通常是興櫃轉上櫃前的興櫃期、新上市前 5 日或減資換股。</dd>
+        <dt>範圍</dt><dd>上市櫃普通股，排除 ETF、權證、特別股、存託憑證；當日未成交的股票不列入。</dd>
+      </dl>`;
+    showSheet();
+  }
+  function showSheet(){
+    $("scrim").classList.add("show"); $("sheet").classList.add("show"); $("sheet").scrollTop = 0;
+    $("closeSheet").addEventListener("click", hideSheet);
+  }
+  function hideSheet(){ $("scrim").classList.remove("show"); $("sheet").classList.remove("show"); }
+  $("scrim").addEventListener("click", hideSheet);
+  addEventListener("keydown", e => { if (e.key === "Escape") hideSheet(); });
+
+  // ---------- 事件 ----------
+  $("thead").addEventListener("click", e => {
+    const th = e.target.closest("th[data-k]"); if (!th) return;
+    const k = th.dataset.k;
+    if (st.s === k) st.d = st.d === "desc" ? "asc" : "desc";
+    else { st.s = k; st.d = (k === "code" || k === "ind") ? "asc" : "desc"; }
+    if (MOBILE_METRICS[k]) st.mm = k;
+    apply();
+  });
+  $("mhead").addEventListener("click", e => {
+    const b = e.target.closest("button[data-ms]"); if (!b) return;
+    const k = b.dataset.ms;
+    if (st.s === k) st.d = st.d === "desc" ? "asc" : "desc"; else { st.s = k; st.d = k === "code" ? "asc" : "desc"; }
+    apply();
+  });
+  const rowClick = e => { const el = e.target.closest("[data-i]"); if (el) openSheet(view[+el.dataset.i]); };
+  $("tbody").addEventListener("click", rowClick);
+  $("mrows").addEventListener("click", rowClick);
+  $("tabs").addEventListener("click", e => {
+    const b = e.target.closest(".tab"); if (!b) return;
+    st.v = b.dataset.v; const t = TABMAP[st.v];
+    st.s = t.s || "rs_y"; st.d = t.dir || "desc"; if (MOBILE_METRICS[st.s]) st.mm = st.s;
+    document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === b));
+    apply();
+  });
+  $("heat").addEventListener("click", e => {
+    const t = e.target.closest(".tile"); if (!t) return;
+    st.ind = st.ind === t.dataset.ind ? "" : t.dataset.ind; $("ind").value = st.ind; apply();
+    $("toolbar").scrollIntoView({behavior: "smooth", block: "start"});
+  });
+  let qt;
+  $("q").addEventListener("input", e => { clearTimeout(qt); qt = setTimeout(() => { st.q = e.target.value; apply(); }, 120); });
+  $("mkt").addEventListener("change", e => { st.mkt = e.target.value; apply(); });
+  $("ind").addEventListener("change", e => { st.ind = e.target.value; apply(); });
+  $("amt").addEventListener("change", e => { st.amt = e.target.value; apply(); });
+  $("clear").addEventListener("click", () => { st.q = st.mkt = st.ind = ""; st.amt = "0"; syncControls(); apply(); });
+  $("helpBtn").addEventListener("click", openHelp);
+
+  const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  const MOON = '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>';
+  const paintTheme = () => { $("themeIco").innerHTML = document.documentElement.dataset.theme === "light" ? MOON : SUN; };
+  $("themeBtn").addEventListener("click", () => {
+    const t = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = t;
+    try { localStorage.setItem("rs-theme", t); } catch (e) {}
+    paintTheme();
+  });
+  paintTheme();
+
+  new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) more(); }, {rootMargin: "800px"}).observe($("sentinel"));
+  function setOffsets(){
+    const top = document.querySelector(".top").offsetHeight, tb = $("toolbar").offsetHeight;
+    document.documentElement.style.setProperty("--th-top", "0px");
+    document.documentElement.style.setProperty("--mh-top", (mq.matches ? top : top + tb) + "px");
+    // 桌機：表頭固定在工具列下方（表格外層不能是捲動容器，所以水平捲動只在窄螢幕才開）
+    const sc = $("scroll"), need = sc.scrollWidth > sc.clientWidth + 1;
+    if (!mq.matches && !need) { sc.style.overflowX = "visible"; $("scroll").parentElement.style.overflow = "visible";
+      document.documentElement.style.setProperty("--th-top", (top + tb) + "px"); }
+    else { sc.style.overflowX = "auto"; }
+  }
+  addEventListener("resize", setOffsets);
+
+  function syncControls(){
+    $("q").value = st.q; $("mkt").value = st.mkt; $("amt").value = st.amt; $("ind").value = st.ind;
+    document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x.dataset.v === st.v));
+  }
+
+  // ---------- 載入 ----------
+  fetch("data/latest.json", {cache: "no-cache"})
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(d => {
+      DATA = d;
+      ALL = d.rows.map(a => { const o = {}; d.fields.forEach((k, i) => o[k] = a[i]); return o; });
+      const v = (d.stats || {}).verify;
+      $("meta").innerHTML = `<span class="pill date num"><span class="dfull">${d.date}</span><span class="dshort">${d.date.slice(5).replace("-", "/")}</span></span>`
+        + `<span class="pill cnt num">${ALL.length.toLocaleString()} 檔</span>`
+        + (v && v.date === d.date ? `<span class="pill ver" title="Yahoo 收盤已與證交所／櫃買中心官方收盤比對"> <span class="dot"></span>官方校對</span>` : "");
+      $("tabs").innerHTML = TABS.map(t => `<button class="tab" role="tab" data-v="${t.k}" aria-selected="false" ${t.d ? `title="${esc(t.d)}"` : ""}>${t.t}<span class="cnt num"></span></button>`).join("");
+      const inds = [...new Set(ALL.map(r => r.ind).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+      $("ind").insertAdjacentHTML("beforeend", inds.map(x => `<option>${esc(x)}</option>`).join(""));
+      readHash(); syncControls(); renderOverview(); renderHeat(); apply(); setOffsets();
+    })
+    .catch(err => { $("overview").innerHTML = `<div class="card" style="grid-column:1/-1">資料載入失敗，請稍後重新整理（${esc(err.message)}）</div>`; });
+})();
+</script>
+</body>
+</html>
