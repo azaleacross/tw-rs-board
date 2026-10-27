@@ -339,23 +339,25 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
   const PAGE = 100;
 
   // ---------- 狀態（同步到網址 #，複製網址給朋友就是同一個畫面） ----------
-  const st = {v: "all", q: "", mkt: "", ind: "", amt: "0", s: "rs_y", d: "desc", mm: "rs_y"};
+  // 預設排序：手機版面小，優先看反應最快的短 RS；桌機欄位都看得到，用年 RS 排
+  const DEF = () => matchMedia("(max-width: 760px)").matches ? "rs_s" : "rs_y";
+  const st = {v: "all", q: "", mkt: "", ind: "", amt: "0", s: DEF(), d: "desc", mm: DEF()};
   let ALL = [], view = [], shown = 0, DATA = null;
 
   const readHash = () => {
     const h = new URLSearchParams(location.hash.slice(1));
     st.v = TABMAP[h.get("v")] ? h.get("v") : "all";
     st.q = h.get("q") || ""; st.mkt = h.get("m") || ""; st.ind = h.get("i") || ""; st.amt = h.get("a") || "0";
-    st.s = h.get("s") || (TABMAP[st.v].s || "rs_y"); st.d = h.get("d") || (TABMAP[st.v].dir || "desc");
-    st.mm = MOBILE_METRICS[h.get("mm")] ? h.get("mm") : (MOBILE_METRICS[st.s] ? st.s : "rs_y");
+    st.s = h.get("s") || (TABMAP[st.v].s || DEF()); st.d = h.get("d") || (TABMAP[st.v].dir || "desc");
+    st.mm = MOBILE_METRICS[h.get("mm")] ? h.get("mm") : (MOBILE_METRICS[st.s] ? st.s : DEF());
   };
   const writeHash = () => {
     const h = new URLSearchParams();
     if (st.v !== "all") h.set("v", st.v); if (st.q) h.set("q", st.q); if (st.mkt) h.set("m", st.mkt);
     if (st.ind) h.set("i", st.ind); if (st.amt !== "0") h.set("a", st.amt);
     const t = TABMAP[st.v];
-    if (st.s !== (t.s || "rs_y")) h.set("s", st.s); if (st.d !== (t.dir || "desc")) h.set("d", st.d);
-    if (st.mm !== "rs_y" && st.mm !== st.s) h.set("mm", st.mm);
+    if (st.s !== (t.s || DEF())) h.set("s", st.s); if (st.d !== (t.dir || "desc")) h.set("d", st.d);
+    if (st.mm !== DEF() && st.mm !== st.s) h.set("mm", st.mm);
     const s = h.toString();
     history.replaceState(null, "", s ? "#" + s : location.pathname + location.search);
   };
@@ -595,7 +597,7 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
   $("tabs").addEventListener("click", e => {
     const b = e.target.closest(".tab"); if (!b) return;
     st.v = b.dataset.v; const t = TABMAP[st.v];
-    st.s = t.s || "rs_y"; st.d = t.dir || "desc"; if (MOBILE_METRICS[st.s]) st.mm = st.s;
+    st.s = t.s || DEF(); st.d = t.dir || "desc"; if (MOBILE_METRICS[st.s]) st.mm = st.s;
     document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === b));
     apply();
   });
