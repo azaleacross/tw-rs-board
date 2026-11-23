@@ -30,13 +30,16 @@ tr:last-child td{border-bottom:0}
 td .s{display:block;font-size:12px;color:var(--mut)}
 .up{color:var(--up)}.dn{color:var(--dn)}.warn{color:var(--warn);font-weight:600}
 .empty{padding:16px;color:var(--mut)}
+.wsys{margin-top:8px;padding-top:4px;border-top:2px solid var(--line)}
+.wsys .desc{font-size:14px;color:var(--mut);margin:4px 0 0}
+.note{font-size:13px;color:var(--mut);margin:6px 0}
 .help{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 16px 12px;font-size:14px}
 .help dt{font-weight:600;margin-top:10px}.help dd{margin:2px 0 0;color:var(--mut)}
 footer{color:var(--mut);font-size:12px;margin:24px 0 40px}
 </style>
 </head>
 <body>
-<header><div class="wrap"><a href="index.html">← RS 雷達</a><h1>CS7 趨勢策略</h1><span class="pill" id="sys"></span><span class="pill" id="date"></span></div></header>
+<header><div class="wrap"><a href="index.html">← RS 雷達</a><h1>CS7 趨勢策略</h1><span class="pill" id="sys"></span><span class="pill" id="date"></span><a href="#weekly">週線策略 ↓</a></div></header>
 <main class="wrap">
   <div class="cards" id="cards"></div>
   <h2 id="buyTitle">明天開盤買</h2>
@@ -47,6 +50,7 @@ footer{color:var(--mut);font-size:12px;margin:24px 0 40px}
   <div class="tbl"><table><thead><tr><th class="l">股票</th><th>進場日</th><th>出場日</th><th>R 倍數</th><th>損益（元）</th><th class="l">原因</th></tr></thead><tbody id="closed"></tbody></table></div>
   <h2>規則與下單方式</h2>
   <dl class="help" id="help"></dl>
+  <section id="weekly"><h2 style="font-size:18px;margin-top:36px">週線策略（CS10）</h2><div id="wbody" class="note">載入中…</div></section>
   <footer id="foot"></footer>
 </main>
 <script>
@@ -95,6 +99,51 @@ footer{color:var(--mut);font-size:12px;margin:24px 0 40px}
       + dt("驗證成績", `CS7 第三階段，2024-01-02 ~ 2026-11-20 只跑一次：年化 +58.1%、最大回撤 −28.3%（0050 含息 +40.8%、−27.5%）。驗證期沒有完整的空頭年；設計期 2022 年是 −31%。勝率約 44%，獲利集中在少數 5 ~ 8R 的交易。`);
     $("foot").textContent = `產生時間 ${d.generated_at}。模擬持股照規則從 ${S.go_live} 開始逐日更新，不是實際帳戶。只用價格、排名、月營收計算。`;
   }).catch(e => { $("cards").innerHTML = `<div class="card">策略資料載入失敗（${esc(e.message)}）</div>`; });
+})();
+</script>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const n = (v, d = 0) => v == null ? "–" : Number(v).toLocaleString("zh-TW", {minimumFractionDigits: d, maximumFractionDigits: d});
+  const px = v => n(v, v == null ? 0 : v < 100 ? 2 : v < 1000 ? 1 : 0);
+  const pct = (v, d = 1) => v == null ? "–" : `<span class="${v > 0 ? "up" : v < 0 ? "dn" : ""}">${v > 0 ? "+" : ""}${(v * 100).toFixed(d)}%</span>`;
+  const pl = v => v == null ? "–" : `${(v * 100).toFixed(1)}%`;
+  const sh = s => { const lots = Math.floor(s / 1000), odd = s % 1000; return `${n(s)}<span class="s">${lots ? lots + " 張" : ""}${odd ? (lots ? "＋" : "") + odd + " 股零股" : ""}</span>`; };
+  const card = (k, v) => `<div class="card"><span>${k}</span><b>${v}</b></div>`;
+  fetch("data/strategy/weekly.json", {cache: "no-cache"}).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then(d => {
+    const M = d.market;
+    let h = `<p class="note">資料 ${esc(d.date)}。週線策略只在<b>每週最後一個交易日</b>收盤後產生買賣訊號，下一個交易日開盤成交；其他日子只檢查日線停損。`
+      + (d.today_is_week_end ? `今天是週決策日。` : `下一個週決策日：${esc(d.next_decision_day || "–")}。`)
+      + ` 加權指數週線（${esc(M.week_of)} 那週）：週收 ${n(M.twii_week)}、10 週線 ${n(M.twii_ma10w)}、30 週線 ${n(M.twii_ma30w)}，`
+      + `<b class="${M.twii_bull_week ? "up" : "dn"}">${M.twii_bull_week ? "多頭（10 週 > 30 週）" : "非多頭"}</b>。</p>`;
+    for (const S of d.systems) {
+      const A = S.account, P = S.params, V = S.verdict, B = V.bench || {};
+      h += `<div class="wsys"><h2>${esc(S.key)} <span class="pill">週線</span> <span class="pill ${V.passed ? "ok" : "no"}">${esc(V.label)}</span></h2>`
+        + `<p class="desc">${esc(S.desc)}</p>`
+        + `<p class="note">驗證期 ${esc((V.valid.period || []).join(" ~ "))}${V.trial ? `（試驗 ${V.trial}）` : ""}：年化 ${pl(V.valid.cagr)}、回撤 ${pl(V.valid.mdd)}、MAR ${n(V.valid.mar, 2)}、平均持有 ${n(V.valid.avg_days)} 天；0050 含息 ${pl(B.cagr)}、${pl(B.mdd)}、MAR ${n(B.mar, 2)}。</p>`;
+      if (!S.started) h += `<p class="note warn">前瞻模擬從 ${esc(S.go_live)} 開始，還沒開始累積。下面的訊號是最近一個週決策日（${esc(S.decision_day)}）的，只供參考。</p>`;
+      h += `<div class="cards">` + card("模擬權益", n(A.equity)) + card("報酬", pct(A.ret)) + card("現金", n(A.cash))
+        + card("持股檔數", `${A.n_pos} / ${P.max_pos}`) + card("總未實現風險", `${((A.risk_open_pct || 0) * 100).toFixed(1)}%`) + `</div>`;
+      h += `<h2>${S.today_is_week_end ? `明天（${esc(d.next_day)}）開盤買` : `最近一個週決策日（${esc(S.decision_day)}）的訊號`}</h2>`
+        + `<div class="tbl"><table><thead><tr><th class="l">股票</th><th class="l">產業</th><th>季 RS</th><th>收盤</th><th>1R</th><th>停損（估）</th><th>建議股數</th><th class="l">狀態</th></tr></thead><tbody>`
+        + (S.signals.length ? S.signals.map(r => `<tr><td class="l"><b>${esc(r.name)}</b><span class="s">${esc(r.code)}</span></td><td class="l">${esc(r.ind)}</td>`
+            + `<td>${n(r.rs_q)}</td><td>${px(r.close)}</td><td>${px(r.one_r)}</td><td>${px(r.stop_est)}</td><td>${sh(r.shares)}</td><td class="l ${r.buy ? "up" : ""}">${esc(r.status)}</td></tr>`).join("")
+          : `<tr><td colspan="8" class="empty">這個週決策日沒有股票符合進場條件。</td></tr>`) + `</tbody></table></div>`;
+      h += `<h2>模擬持股</h2><div class="tbl"><table><thead><tr><th class="l">股票</th><th>進場日</th><th>進場價</th><th>股數</th><th>收盤</th><th>停損價</th><th>災難停損</th><th>週線出場線</th><th>R 倍數</th><th>損益</th><th>天數</th><th class="l">明天</th></tr></thead><tbody>`
+        + (S.positions.length ? S.positions.map(r => `<tr><td class="l"><b>${esc(r.name)}</b><span class="s">${esc(r.code)}・${esc(r.ind)}</span></td><td>${r.entry_date}</td><td>${px(r.entry_px)}</td>`
+            + `<td>${sh(r.shares)}</td><td>${px(r.close)}</td><td><b>${px(r.stop)}</b></td><td>${px(r.dis)}</td><td>${px(r.wexit)}</td><td>${n(r.r_now, 2)}R</td><td>${pct(r.pnl_pct)}</td><td>${r.days}</td>`
+            + `<td class="l ${r.exit_next ? "warn" : ""}">${r.exit_next ? (r.exit_part != null && r.exit_part < 1 ? "開盤賣一半（" : "開盤賣（") + esc(r.exit_why) + "）" : "續抱"}</td></tr>`).join("")
+          : `<tr><td colspan="12" class="empty">目前沒有模擬持股（模擬從 ${esc(S.go_live)} 開始）。</td></tr>`) + `</tbody></table></div>`;
+      h += `<h2>最近出場</h2><div class="tbl"><table><thead><tr><th class="l">股票</th><th>進場日</th><th>出場日</th><th>R 倍數</th><th>損益（元）</th><th class="l">原因</th></tr></thead><tbody>`
+        + (S.started && S.closed.length ? S.closed.map(r => `<tr><td class="l"><b>${esc(r.name)}</b><span class="s">${esc(r.code)}</span></td><td>${r.entry_date}</td><td>${r.exit_date}</td><td>${n(r.r_mult, 2)}R</td><td>${n(r.pnl)}</td><td class="l">${esc(r.why)}</td></tr>`).join("")
+          : `<tr><td colspan="6" class="empty">還沒有出場紀錄。</td></tr>`) + `</tbody></table></div>`;
+      h += `<p class="note">停損價：收盤跌破就隔天開盤賣（只看收盤）。災難停損 = 進場價 − ${P.dis_atr || 3} × ATR20，空白代表這個策略的停損本來就比它緊。週線出場線 = 最近一個收完的週的均線，週收盤跌破才在下一個交易日開盤賣（空白代表這個策略沒有週線出場）。模擬持股照規則從 ${esc(S.go_live)} 開始，不是實際帳戶，前瞻結果不拿來改規則。</p></div>`;
+    }
+    $("wbody").className = ""; $("wbody").innerHTML = h;
+  }).catch(e => { $("wbody").textContent = `週線策略資料載入失敗（${e.message}）`; });
 })();
 </script>
 </body>
