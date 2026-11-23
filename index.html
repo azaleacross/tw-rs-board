@@ -253,7 +253,6 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
     </div>
     <div class="meta" id="meta"></div>
     <div class="spacer"></div>
-    <a class="iconbtn" id="stratLink" href="strategy.html" style="text-decoration:none" title="CS7 趨勢策略：進場訊號與模擬持股">策略</a>
     <button class="iconbtn" id="helpBtn" aria-label="指標說明"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/></svg><span class="lbl-help">說明</span></button>
     <button class="iconbtn" id="themeBtn" aria-label="切換深色／淺色"><svg id="themeIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"></svg></button>
   </div>
@@ -285,7 +284,7 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
     <div class="scroll" id="scroll">
       <table>
         <thead>
-          <tr class="grp"><th colspan="6"></th><th colspan="3"><span>相對強度 RS（1~99）</span></th><th colspan="2"><span>短 RS 變化</span></th><th colspan="4"><span>趨勢 R²（+ 順漲／− 順跌）</span></th><th></th><th colspan="2"><span>CS7 策略</span></th></tr>
+          <tr class="grp"><th colspan="6"></th><th colspan="3"><span>相對強度 RS（1~99）</span></th><th colspan="2"><span>短 RS 變化</span></th><th colspan="4"><span>趨勢 R²（+ 順漲／− 順跌）</span></th><th></th></tr>
           <tr id="thead"></tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -333,8 +332,6 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
     {k: "high",  t: "創 60 日新高", f: r => r.hl >= 60, s: "hl", d: "收盤創近 60 個交易日以上新高"},
     {k: "trend", t: "趨勢最穩",   f: r => r.r2_60 >= 0.8 && r.r2_120 >= 0.5, s: "r2_60",
      d: "R² 60 ≥ 0.8 且 R² 120 ≥ 0.5：漲得又直又穩，回檔小"},
-    {k: "strat", t: "策略",       f: r => r.st != null, s: "st",
-     d: "CS7 趨勢策略今天的進場訊號與模擬持股（詳細在右上角「策略」頁）"},
     {k: "weak",  t: "弱勢股",     f: r => r.rs_s <= 10 && r.rs_q <= 20, s: "rs_s", dir: "asc",
      d: "短 RS ≤ 10 且季 RS ≤ 20：短期與中期都在全市場最弱的一群"},
   ];
@@ -358,13 +355,10 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
     {k: "r2_60",  t: "R² 60"},
     {k: "r2_120", t: "R² 120"},
     {k: "hl",     t: "創新高／低"},
-    {k: "st",     t: "策略"},
-    {k: "st_stop", t: "停損"},
   ];
   const MOBILE_METRICS = {rs_s: "短 RS", ds1: "短RS±1日", ds5: "短RS±5日", rs_q: "季 RS", rs_y: "年 RS", hl: "新高低", r2_20: "R² 20", r2_60: "R² 60",
     r2_120: "R² 120", r2_10: "R² 10", amt: "均額", close: "收盤"};
   const PAGE = 100;
-  const STLBL = {1: '<span style="color:var(--up)">訊號</span>', 2: "持有", 3: '<span style="color:var(--dn)">持有・明天賣</span>'};
 
   // ---------- 狀態（同步到網址 #，複製網址給朋友就是同一個畫面） ----------
   // 預設排序：手機版面小，優先看反應最快的短 RS；桌機欄位都看得到，用年 RS 排
@@ -561,8 +555,7 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
       <td>${rsTxt(r.rs_s)}</td><td>${rsTxt(r.rs_q)}</td><td>${rsTxt(r.rs_y)}</td>
       <td>${dltTxt(r.ds1)}</td><td>${dltTxt(r.ds5)}</td>
       <td>${r2Txt(r.r2_10)}</td><td>${r2Txt(r.r2_20)}</td><td>${r2Txt(r.r2_60)}</td><td>${r2Txt(r.r2_120)}</td>
-      <td>${hlTxt(r.hl)}</td>
-      <td>${STLBL[r.st] || ""}</td><td class="px">${r.st_stop == null ? "" : fmt(r.st_stop, pxd(r.st_stop))}</td></tr>`;
+      <td>${hlTxt(r.hl)}</td></tr>`;
   }
   function metricTxt(r){
     const k = st.mm, v = r[k];
@@ -735,16 +728,9 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
   // ---------- 載入 ----------
   fetch("data/latest.json", {cache: "no-cache"})
     .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(d => fetch("data/strategy/latest.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : null).catch(() => null).then(s => [d, s]))
-    .then(([d, strat]) => {
+    .then(d => {
       DATA = d;
       ALL = d.rows.map(a => { const o = {}; d.fields.forEach((k, i) => o[k] = a[i]); return o; });
-      // CS7 策略：st = 3 持有（明天賣）、2 持有、1 進場訊號；st_stop = 持股的停損價、訊號的估計停損
-      if (strat) {
-        const by = Object.fromEntries(ALL.map(r => [r.code, r]));
-        (strat.signals || []).forEach(x => { const r = by[x.code]; if (r) { r.st = 1; r.st_stop = x.stop_est; } });
-        (strat.positions || []).forEach(x => { const r = by[x.code]; if (r) { r.st = x.exit_next ? 3 : 2; r.st_stop = x.stop; } });
-      }
       const v = (d.stats || {}).verify;
       $("meta").innerHTML = `<span class="pill date num"><span class="dfull">${d.date}</span><span class="dshort">${d.date.slice(5).replace("-", "/")}</span></span>`
         + `<span class="pill cnt num">${ALL.length.toLocaleString()} 檔</span>`

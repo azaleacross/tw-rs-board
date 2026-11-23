@@ -1,0 +1,4 @@
+# 策略分頁只放在 Mac mini 的私人工作台（2026-11-23 起），公開看板不放。
+# 研究程式（CS10 weekly_signals.py）可能還會寫 data/strategy/，這裡忽略，publish 的 git add -A 不會帶上去。
+strategy.html
+data/strategy/
