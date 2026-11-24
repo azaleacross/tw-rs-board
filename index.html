@@ -54,6 +54,7 @@ button,input,select{font:inherit;color:inherit}
 .meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12.5px;min-width:0;overflow:hidden;white-space:nowrap}
 .pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink2);white-space:nowrap}
 .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--dn)}
+.pill.ed.fast{color:var(--warn);border-color:var(--warn)}
 .spacer{flex:1}
 .iconbtn{height:32px;min-width:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;color:var(--ink2);font-size:12.5px}
 .iconbtn:hover{background:var(--hover);color:var(--ink)}
@@ -734,7 +735,11 @@ footer{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 0 48px;bord
       const v = (d.stats || {}).verify;
       $("meta").innerHTML = `<span class="pill date num"><span class="dfull">${d.date}</span><span class="dshort">${d.date.slice(5).replace("-", "/")}</span></span>`
         + `<span class="pill cnt num">${ALL.length.toLocaleString()} 檔</span>`
-        + (v && v.date === d.date ? `<span class="pill ver" title="Yahoo 收盤已與證交所／櫃買中心官方收盤比對"> <span class="dot"></span>官方校對</span>` : "");
+        + (v && v.date === d.date ? `<span class="pill ver" title="Yahoo 收盤已與證交所／櫃買中心官方收盤比對"> <span class="dot"></span>官方校對</span>` : "")
+        + (d.edition === "fast"
+          ? `<span class="pill ed fast" title="收盤後用永豐即時報價算的快速版，資料時間 ${esc(String(d.data_at || "").replace("T", " ").slice(0, 16))}；晚上官方資料進來後換成正式版">快速版 ${esc(String(d.data_at || "").slice(11, 16))}</span>`
+          : d.edition === "official"
+            ? `<span class="pill ed" title="官方收盤資料算的正式版，產生時間 ${esc(String(d.data_at || ""))}">正式版</span>` : "");
       $("tabs").innerHTML = TABS.map(t => `<button class="tab" role="tab" data-v="${t.k}" aria-selected="false" ${t.d ? `title="${esc(t.d)}"` : ""}>${t.t}<span class="cnt num"></span></button>`).join("");
       const inds = [...new Set(ALL.map(r => r.ind).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
       $("ind").insertAdjacentHTML("beforeend", inds.map(x => `<option>${esc(x)}</option>`).join(""));
